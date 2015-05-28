@@ -14,6 +14,8 @@ To style specific elements in the html, simply assign the element a class that m
     <span class="keyword">This should be styled like a keyword</span>
     <span class="support type"> This should be styled similar to a support type within the theme</span>
     
+![alt text](https://raw.githubusercontent.com/huot25/StyledTooltip/master/screen_shots/screen_1.png)
+    
 ### Calling the Styled Tooltip.
 
 I have created a new command that will automatically insert the stylesheet when called. Instead of calling view.show_popup directory, call view.run_command("styled_tooltip", {"content": "Your HTML Content Here"}). 
