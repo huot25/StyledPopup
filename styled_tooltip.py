@@ -37,14 +37,15 @@ class SchemeParser():
 
 			# Parse the settings for the node and map 
 			for key in node["settings"]:
-				css = CSSHelper.get_css_name(key, node["settings"][key])
+				for value in node["settings"][key].split():
+					css = CSSHelper.get_css_name(key, value)
 
-				# If no mapping exists for the key, skip it
-				if (css == None):
-					continue
+					# If no mapping exists for the key, skip it
+					if (css == None):
+						continue
 
-				# Create a dictionary entry for each valid key and value.
-				tmp_dict[css] = CSSHelper.get_property_value(css, node["settings"][key])
+					# Create a dictionary entry for each valid key and value.
+					tmp_dict[css] = CSSHelper.get_property_value(css, value)
 
 			if not len(tmp_dict):
 				continue
@@ -250,7 +251,7 @@ class StyledTooltipTestCommand(sublime_plugin.WindowCommand):
 		content = "<p class=\"constant language\">Keyword</p>"
 		content += "<p class=\"comment line\">This is a comment</p>"
 		content += "<p class=\"support function\">Storage Type</p>"
-		content += "<p class=\"markup inserted\">What</p>"
+		content += "<p class=\"entity other inherited-class\">What</p>"
 
 		self.window.run_command("styled_tooltip", {"content": content, "max_width": 600} )
 
