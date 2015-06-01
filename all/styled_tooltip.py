@@ -6,6 +6,7 @@ import os
 from plistlib import readPlistFromBytes
 
 RUNNING = False
+USER_SETTINGS = {}
 
 class SchemeParser():
 	"""Parses color scheme and builds css file"""
@@ -219,26 +220,28 @@ class ParseSchemeCommand(sublime_plugin.ApplicationCommand):
 
 
 def plugin_loaded():
-	settings = sublime.load_settings("Preferences.sublime-settings")
-	
-	if settings.get("run_on_plugin_loaded", True):
+	load_settings()
+
+	if USER_SETTINGS["run_on_plugin_loaded"]:
 		add_listener()
 		sublime.run_command("parse_scheme")
 
-
-def add_listener():
+def load_settings():
 	settings = sublime.load_settings("Preferences.sublime-settings")
 
-	if settings.get("run_on_scheme_change", True):
+	USER_SETTINGS["run_on_plugin_loaded"] = settings.get("run_on_plugin_loaded", True)
+	USER_SETTINGS["run_on_scheme_change"] = settings.get("run_on_scheme_change", True)
+
+def add_listener():
+	if USER_SETTINGS["run_on_scheme_change"]:
+		settings = sublime.load_settings("Preferences.sublime-settings")
 		settings.add_on_change("color_scheme", scheme_changed)
 
 
 def scheme_changed():
 	global RUNNING
 
-	settings = sublime.load_settings("Preferences.sublime-settings")
-
-	if settings.get("run_on_scheme_change", True):
+	if USER_SETTINGS["run_on_scheme_change"]:
 		if (not RUNNING):
 			sublime.run_command("parse_scheme")
 
