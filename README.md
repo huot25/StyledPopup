@@ -14,7 +14,7 @@ To style specific elements in the html, simply assign the element a class that m
     <span class="keyword">This should be styled like a keyword</span>
     <span class="support type"> This should be styled similar to a support type within the theme</span>
     
-![alt text](https://raw.githubusercontent.com/huot25/StyledTooltip/master/screen_shots/screen_1.png)
+![alt text](http://huotmedia.com/github/StyledTooltip/images/screen_1.png)
     
 ### Calling the Styled Tooltip.
 
