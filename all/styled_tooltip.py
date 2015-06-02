@@ -1,22 +1,45 @@
-"""Styled Tooltip"""
+"""StyledPopup"""
 import sublime
 import sublime_plugin
 import os
+import hashlib
 
 from plistlib import readPlistFromBytes
 
-RUNNING = False
-USER_SETTINGS = {}
+def show_popup(view, content, **kwargs):
+	if (view == None):
+		view = self.window.active_view()
+
+	manager = StyleSheetManager()
+	style_sheet = manager.get_stylesheet(view.settings().get("color_scheme"))["content"]
+
+	html = "<style>%s</style>" % (style_sheet)
+	html += content
+
+	view.show_popup(html, **kwargs)
 
 class SchemeParser():
 	"""Parses color scheme and builds css file"""
 
-	def load_color_scheme(self):
+	def run(self):
+		"""Parse the color scheme for the active view."""
+
+		print ("Styled Popup: Parsing color scheme")
+		content = self.load_color_scheme()
+		plist_dict = self.read_scheme(content)
+		css_stack = self.parse_plist(plist_dict["settings"])
+		style_sheet = self.generate_style_sheet_content(css_stack)
+		return style_sheet
+
+	def load_color_scheme(self, view=None):
 		"""Read the color_scheme user settings and load the file contents."""
 
-		scheme_path = sublime.load_settings("Preferences.sublime-settings").get("color_scheme", "Packages/Color Scheme - Default/Monokai.tmTheme")
-		scheme = sublime.load_binary_resource(scheme_path)
-		return scheme
+		if view == None:
+			view = sublime.active_window().active_view()
+
+		scheme = view.settings().get("color_scheme")
+		content  = sublime.load_binary_resource(scheme)
+		return content
 
 	def read_scheme(self, scheme):
 		"""Converts supplied scheme(bytes) to python dict."""
@@ -53,8 +76,6 @@ class SchemeParser():
 
 			# If no scope node, assume it is the default settings
 			if not "scope" in node :
-				# tmp_dict["margin"] = "2px"
-				# tmp_dict["padding"] = "1em"
 				tmp_dict[CSSHelper.CSS_NAME_MAP["background"]] = ColorHelper().getTintedColor(tmp_dict[CSSHelper.CSS_NAME_MAP["background"]], 10)
 				css_stack["html"] = tmp_dict
 			else:
@@ -75,14 +96,6 @@ class SchemeParser():
 					css_stack[ scopes[i] ] = tmp_dict
 
 		return css_stack
-
-	def generate_style_sheet(self, dict):
-		"""Create a css file from the css generated from the scheme"""
-
-		file_path = sublime.packages_path() + os.sep + "User" + os.sep + "theme_styles.css"
-		f = open(file_path, "w")
-		f.write(self.generate_style_sheet_content(dict))
-		f.close()
 
 	def generate_style_sheet_content(self, dict):
 		file_content = ""
@@ -183,78 +196,97 @@ class ColorHelper():
 		return "#%02x%02x%02x" % rgb
 
 
-class StyledTooltipCommand(sublime_plugin.WindowCommand):
-	def run(self, content, flags = 0, location = -1, max_width = 320, max_height = 240,
-		on_navigate = None, on_hide = None, view=None):
-		"""Read the contents of the generated stylesheet and prepend the stylesheet
-		     content within a style tag.
-		"""
+class StyleSheetManager():
 
-		if (view == None):
-			view = self.window.active_view()
+	def __init__(self):
+		self.theme_file_path = sublime.packages_path() + os.sep + "User" + os.sep + "theme_styles.json"
 
-		style_sheet = sublime.load_resource("Packages/User/theme_styles.css")
+	def get_stylesheets_content(self):
+		"""Load the content of the theme_styles.json file."""
 
-		html = "<style>%s</style>" % (style_sheet)
-		html += content
+		content = None
 
-		view.show_popup(html, flags, location, max_width, max_height, on_navigate, on_hide)
+		if (os.path.isfile(self.theme_file_path)):
+			content = sublime.load_resource("Packages/User/theme_styles.json")
+
+		return content
+
+	def get_stylesheets(self):
+		"""Get the stylesheet dict from the file or return an empty dictionary no file contents."""
+
+		content = self.get_stylesheets_content()
+		if (content):
+			style_sheets = sublime.decode_value(str(content))
+		else:
+			style_sheets = {}
+			
+		return style_sheets
+
+	def set_stylesheets(self, style_sheets):
+		"""Save the stylesheet dictionary to file"""
+
+		content = sublime.encode_value(style_sheets, True)
+
+		with open(self.theme_file_path, "w") as f:
+			f.write(content)
+
+	def has_stylesheet(self, color_scheme):
+		"""Check if the stylesheet dictionary has the current color scheme."""
+
+		if color_scheme in self.get_stylesheets():
+			return True
+
+		return False
+
+	def add_stylesheet(self, color_scheme, content):
+		"""Add the parsed color scheme to the stylesheets dictionary."""
+
+		style_sheets = self.get_stylesheets()
+		file_hash = self.get_file_hash(color_scheme)
+		style_sheets[color_scheme] = {"content": content, "hash": file_hash}
+		self.set_stylesheets(style_sheets)
+
+	def get_stylesheet(self, color_scheme):
+		"""Get the supplied color scheme stylesheet if it exists."""
+
+		style_sheets = self.get_stylesheets()
+		return style_sheets[color_scheme]
+
+	def get_file_hash(self, color_scheme):
+		"""Generate an MD5 hash of the color scheme file to be compared for changes."""
+
+		content = sublime.load_binary_resource(color_scheme)
+		file_hash = hashlib.md5(content).hexdigest()
+		return file_hash
+
+	def check_file_hash(self, color_scheme):
+		"""Check if the color scheme file has changed on disk."""
+
+		current_hash = self.get_file_hash(color_scheme)
+		stored_hash = self.get_stylesheet(color_scheme)["hash"]
+		return (current_hash == stored_hash)
 
 
-class ParseSchemeCommand(sublime_plugin.ApplicationCommand):
+class ColorSchemeListener(sublime_plugin.EventListener):
+	def on_activated_async(self, view):
+		"""Parse the color scheme if needed or if the color scheme file has changed."""
 
-	def run(self):
-		global RUNNING
-
-		if (RUNNING):
+		if view == None:
 			return
 
-		RUNNING = True
-		parser = SchemeParser()
-		scheme = parser.load_color_scheme()
-		plist_dict = parser.read_scheme(scheme)
-		css_stack = parser.parse_plist(plist_dict["settings"])
+		manager = StyleSheetManager()
+		color_scheme = view.settings().get("color_scheme")
 
-		parser.generate_style_sheet(css_stack)
-		RUNNING = False
+		if (not manager.has_stylesheet(color_scheme) or 
+		    not manager.check_file_hash(color_scheme)):
+			style_sheet = SchemeParser().run()
+			manager.add_stylesheet(color_scheme, style_sheet)
 
-
-def plugin_loaded():
-	load_settings()
-
-	if USER_SETTINGS["run_on_plugin_loaded"]:
-		add_listener()
-		sublime.run_command("parse_scheme")
-
-def load_settings():
-	settings = sublime.load_settings("Preferences.sublime-settings")
-
-	USER_SETTINGS["run_on_plugin_loaded"] = settings.get("run_on_plugin_loaded", True)
-	USER_SETTINGS["run_on_scheme_change"] = settings.get("run_on_scheme_change", True)
-
-def add_listener():
-	if USER_SETTINGS["run_on_scheme_change"]:
-		settings = sublime.load_settings("Preferences.sublime-settings")
-		settings.add_on_change("color_scheme", scheme_changed)
-
-
-def scheme_changed():
-	global RUNNING
-
-	if USER_SETTINGS["run_on_scheme_change"]:
-		if (not RUNNING):
-			sublime.run_command("parse_scheme")
+# add the custom event listener to the plugin callbacks manually so the on_activated handler is called
+sublime_plugin.all_callbacks["on_activated_async"].append(ColorSchemeListener())
 
 
 
-### Command for testing ###
 
-class StyledTooltipTestCommand(sublime_plugin.WindowCommand):
-	def run(self):
-		content = "<p class=\"constant language\">Keyword</p>"
-		content += "<p class=\"comment line\">This is a comment</p>"
-		content += "<p class=\"support function\">Storage Type</p>"
-		content += "<p class=\"entity other inherited-class\">What</p>"
 
-		self.window.run_command("styled_tooltip", {"content": content, "max_width": 600} )
 
