@@ -28,10 +28,14 @@ Each nested scope selector should be applied as a seperate css class:
 Import the module using:
 
 ```python
-from StyledPopup import styled_popup
+import StyledPopup
 ```
 
-Then call the styled_popup function passing the view associated with the popup and any arguments to be passed to the view's show_popup function.
+Then call the StyledPopup.show_popup function passing the view associated with the popup and any arguments to be passed to the view's show_popup function. The html will have the style sheet appended automatically and any css styles that match a given scope will be styled.
+
+```python
+StyledPopup.show_popup(view, html)
+```
 
 ## Future Tasks
 
