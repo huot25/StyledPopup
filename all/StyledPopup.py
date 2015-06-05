@@ -248,9 +248,13 @@ class StyleSheetManager():
 
 	def get_stylesheet(self, color_scheme):
 		"""Get the supplied color scheme stylesheet if it exists."""
-
+		sheet = None
 		style_sheets = self.get_stylesheets()
-		return style_sheets[color_scheme]
+		
+		if color_scheme in style_sheets:
+			sheet = style_sheets[color_scheme]
+
+		return sheet
 
 	def get_file_hash(self, color_scheme):
 		"""Generate an MD5 hash of the color scheme file to be compared for changes."""
