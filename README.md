@@ -1,9 +1,9 @@
 # StyledPopup
-This plugin provides a standardized way to style view popups based on the user's color scheme.
+This plugin provides a standardized way to style view popups based on the view's color scheme.
 
-The plugin will parse the users active color scheme and generate a style sheet which can be used to style the html displayed in the popup.
+The plugin will parse the active color scheme and generate a style sheet which can be used to style the html displayed in the popup.
 
-The classes generated are based on the scopes available within the color scheme. Since all color schemes are based on specific scopes, this provides a common method to style html elements.
+The classes generated are based on the scopes available within the color scheme. Since all color schemes are based on common scopes, this provides an ideal method to style html elements.
 
 ## Usage
 
