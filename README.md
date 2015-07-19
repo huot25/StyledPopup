@@ -37,7 +37,25 @@ Then call the StyledPopup.show_popup function passing the view associated with t
 StyledPopup.show_popup(view, html)
 ```
 
+### Example Command
+
+```python
+import sublime
+import sublime_plugin
+import StyledPopup
+
+class TooltipTestCommand(sublime_plugin.WindowCommand):
+	def run(self):
+
+		html = "Each <span class=\"keyword\">element</span> within " \
+			"the <span class=\"entity name class\">html</span> can be styled " \
+			"individually using common <span class=\"string quoted\">scope</span> names. " \
+			"Simply wrap each element to be styled in a span and apply the " \
+			"<span class=\"comment line\">css classes</span> for each scope."
+
+		StyledPopup.show_popup(self.window.active_view(), html)
+```
+
 ## Future Tasks
 
-1. Finalize code, clean-up, and commet
-2. Implement styled code blocks with language based syntax coloring.
+1. Implement styled code blocks with language based syntax coloring.
