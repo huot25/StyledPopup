@@ -45,15 +45,15 @@ import sublime_plugin
 import StyledPopup
 
 class TooltipTestCommand(sublime_plugin.WindowCommand):
-	def run(self):
+    def run(self):
 
-		html = "Each <span class=\"keyword\">element</span> within " \
-			"the <span class=\"entity name class\">html</span> can be styled " \
-			"individually using common <span class=\"string quoted\">scope</span> names. " \
-			"Simply wrap each element to be styled in a span and apply the " \
-			"<span class=\"comment line\">css classes</span> for each scope."
+        html = "Each <span class=\"keyword\">element</span> within " \
+                    "the <span class=\"entity name class\">html</span> can be styled " \
+                    "individually using common <span class=\"string quoted\">scope</span> names. " \
+                    "Simply wrap each element to be styled in a span and apply the " \
+                    "<span class=\"comment line\">css classes</span> for each scope."
 
-		StyledPopup.show_popup(self.window.active_view(), html)
+        StyledPopup.show_popup(self.window.active_view(), html)
 ```
 
 ## Future Tasks
