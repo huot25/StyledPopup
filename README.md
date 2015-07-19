@@ -39,12 +39,14 @@ StyledPopup.show_popup(view, html)
 
 ### Example Command
 
+Create a new python file within the "User" directory of packages. Paste the following code into the new file and save.
+
 ```python
 import sublime
 import sublime_plugin
 import StyledPopup
 
-class TooltipTestCommand(sublime_plugin.WindowCommand):
+class PopupTestCommand(sublime_plugin.WindowCommand):
     def run(self):
 
         html = "Each <span class=\"keyword\">element</span> within " \
@@ -55,6 +57,8 @@ class TooltipTestCommand(sublime_plugin.WindowCommand):
 
         StyledPopup.show_popup(self.window.active_view(), html)
 ```
+
+Open the Sublime Text Console("ctrl+`") and enter "window.run_command('popup_test')" into the input field at the bottom of the console and press "Enter". You should see a popup window appear which follows the styling for the active view.  
 
 ## Future Tasks
 
