@@ -49,16 +49,22 @@ import StyledPopup
 class PopupTestCommand(sublime_plugin.WindowCommand):
     def run(self):
 
-        html = "Each <span class=\"keyword\">element</span> within " \
-                "the <span class=\"entity name class\">html</span> can be styled " \
-                "individually using common <span class=\"string quoted\">scope</span> names. " \
-                "Simply wrap each element to be styled in a span and apply the " \
-                "<span class=\"comment line\">css classes</span> for each scope."
+        html = """Each <span class="keyword">element</span> within
+                  the <span class="entity name class">html</span> can be styled
+                  individually using common <span class="string quoted">scope</span> names.
+                  Simply wrap each element to be styled in a span and apply the
+                  <span class="comment line">css classes</span> for each scope."""
 
         StyledPopup.show_popup(self.window.active_view(), html)
 ```
 
-Open the Sublime Text Console("ctrl+`") and enter "window.run_command('popup_test')" into the input field at the bottom of the console and press "Enter". You should see a popup window appear which follows the styling for the active view.  
+Open the Sublime Text Console("ctrl+`") and enter "window.run_command('popup_test')" into the input field at the bottom of the console and press "Enter". You should see a popup window appear which follows the styling for the active view.
+
+## Package Settings
+
+**popup_style_cache_limit**
+> An integer setting that controls the number of parsed color scheme to cache.
+> *Default:* **5**
 
 ## Future Tasks
 

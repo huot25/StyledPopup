@@ -1,8 +1,9 @@
-"""StyledPopup"""
+"""styled_popup"""
 import sublime
 import sublime_plugin
 import os
 import hashlib
+import time
 
 from plistlib import readPlistFromBytes
 
@@ -17,8 +18,10 @@ def show_popup(view, content, *args, **kwargs):
 
 	style_sheet = manager.get_stylesheet(color_scheme)["content"]
 
-	html = "<style>%s</style>" % (style_sheet)
+	html = "<html><body>"
+	html += "<style>%s</style>" % (style_sheet)
 	html += content
+	html += "</body></html>"
 
 	view.show_popup(html,  *args, **kwargs)
 
@@ -29,9 +32,11 @@ class StyleSheetManager():
 	style_sheets = {}
 
 	def __init__(self):
-		self.theme_file_path = os.path.join([sublime.packages_path(), "User", "theme_styles.json"])
-		self.resource_path = "/".join(["Packages", "User", "theme_styles.json"])
+		self.theme_file_path = os.path.join(sublime.packages_path(), "User", "scheme_styles.json")
+		self.resource_path = "/".join(["Packages", "User", "scheme_styles.json"])
 		self.style_sheets = {}
+		settings = sublime.load_settings("Preferences.sublime-settings")
+		self.cache_limit = settings.get("popup_style_cache_limit", 5)
 
 	def is_stylesheet_parsed_and_current(self, color_scheme):
 		"""Parse the color scheme if needed or if the color scheme file has changed."""
@@ -42,10 +47,9 @@ class StyleSheetManager():
 		return True
 
 	def load_stylesheets_content(self):
-		"""Load the content of the theme_styles.json file."""
+		"""Load the content of the scheme_styles.json file."""
 
-		content = None
-
+		content = ""
 		if  os.path.isfile(self.theme_file_path):
 			content = sublime.load_resource(self.resource_path)
 
@@ -53,17 +57,20 @@ class StyleSheetManager():
 
 	def get_stylesheets(self):
 		"""Get the stylesheet dict from the file or return an empty dictionary no file contents."""
-		
+
 		if not len(self.style_sheets):
 			content = self.load_stylesheets_content()
 			if  len(content):
 				self.style_sheets = sublime.decode_value(str(content))
-			
+
 		return self.style_sheets
+
+	def count_stylesheets(self):
+		return len(self.get_stylesheets())
 
 	def save_stylesheets(self, style_sheets):
 		"""Save the stylesheet dictionary to file"""
-	
+
 		content = sublime.encode_value(style_sheets, True)
 
 		with open(self.theme_file_path, "w") as f:
@@ -83,21 +90,40 @@ class StyleSheetManager():
 		"""Add the parsed color scheme to the stylesheets dictionary."""
 
 		style_sheets = self.get_stylesheets()
+
+		if (self.count_stylesheets() >= self.cache_limit):
+			self.drop_oldest_stylesheet()
+
 		file_hash = self.get_file_hash(color_scheme)
-		style_sheets[color_scheme] = {"content": content, "hash": file_hash}
+		style_sheets[color_scheme] = {"content": content, "hash": file_hash, "time": time.time()}
 		self.save_stylesheets(style_sheets)
 
 	def get_stylesheet(self, color_scheme):
 		"""Get the supplied color scheme stylesheet if it exists."""
 		active_sheet = None
 
-		if self.is_stylesheet_parsed_and_current(color_scheme):
-			active_sheet = self.get_stylesheets()[color_scheme]
-		else:
-			active_sheet = SchemeParser().run(color_scheme)
-			self.add_stylesheet(color_scheme, active_sheet)
+		if not self.is_stylesheet_parsed_and_current(color_scheme):
+			scheme_css = SchemeParser().run(color_scheme)
+			self.add_stylesheet(color_scheme, scheme_css)
+
+		active_sheet = self.get_stylesheets()[color_scheme]
+
 
 		return active_sheet
+
+	def drop_oldest_stylesheet(self):
+		style_sheets = self.get_stylesheets()
+
+		def sortByTime(item):
+			return style_sheets[item]["time"]
+
+		keys = sorted(style_sheets, key = sortByTime)
+
+		while len(style_sheets) >= self.cache_limit:
+			del style_sheets[keys[0]]
+			del keys[0]
+
+		self.save_stylesheets(style_sheets)
 
 	def get_file_hash(self, color_scheme):
 		"""Generate an MD5 hash of the color scheme file to be compared for changes."""
@@ -109,8 +135,14 @@ class StyleSheetManager():
 	def is_file_hash_stale(self, color_scheme):
 		"""Check if the color scheme file has changed on disk."""
 
+		stored_hash = ""
 		current_hash = self.get_file_hash(color_scheme)
-		stored_hash = self.get_stylesheet(color_scheme)["hash"]
+		styles_heets = self.get_stylesheets()
+
+		if color_scheme in styles_heets:
+			# stored_hash = styles_heets[color_scheme]["hash"]
+			stored_hash = styles_heets[color_scheme]["hash"]
+
 		return (current_hash == stored_hash)
 
 
@@ -124,7 +156,7 @@ class SchemeParser():
 
 		content = self.load_color_scheme(color_scheme)
 		scheme = self.read_scheme(content)
-		css_stack = StackBuilder().create_css_stack(scheme["settings"])
+		css_stack = StackBuilder().build_stack(scheme["settings"])
 		style_sheet = self.generate_style_sheet_content(css_stack)
 		return style_sheet
 
@@ -141,11 +173,17 @@ class SchemeParser():
 
 	def generate_style_sheet_content(self, properties):
 		file_content = ""
+		formatted_properties = []
+		sorted(properties, key=str.lower)
+
 		for css_class in properties:
 			properties_string = CSSFactory.generate_properties_string(css_class, properties)
-			file_content += "%s { %s } " % (css_class, properties_string)
+			formatted_properties.append("%s { %s } " % (css_class, properties_string))
+
+		file_content = "".join(formatted_properties)
 
 		return file_content
+
 
 class StackBuilder():
 	stack = {}
@@ -193,6 +231,8 @@ class StackBuilder():
 				classes = self.get_node_classes_from_scope(node["scope"])
 				self.apply_properties_to_classes(classes, css_properties)
 
+		return self.stack
+
 	def generate_css_properties(self, styles):
 		properties = {}
 		for key in styles:
@@ -203,17 +243,25 @@ class StackBuilder():
 		return properties
 
 	def set_base_style(self, css_style):
+		css_background_property = CSSFactory.CSS_NAME_MAP["background"]
+		css_style[css_background_property] = ColorFactory().getTintedColor(css_style[css_background_property], 10)
 		self.stack["html"] = css_style
 
 	def apply_properties_to_classes(self, classes, properties):
 		for css_class in classes:
-			self.set_scope_style(css_class, properties)
+			css_class = css_class.strip()
+			if (not css_class.startswith(".")):
+				css_class = "." + css_class
+
+			self.set_class_properties(css_class, properties)
 
 	def set_class_properties(self, css_class, properties):
 		self.stack[css_class] = properties
-				
+
 	def get_node_classes_from_scope(self, scope):
-		scope = "." + scope.lower()
+		scope = "." + scope.lower().strip()
+		scope = scope.replace(" - ","")
+		scope = scope.replace(" ", ".")
 		scopes = scope.split(",")
 		return scopes
 
@@ -221,7 +269,7 @@ class StackBuilder():
 class CSSFactory():
 
 	CSS_NAME_MAP = {
-		"background": "background-color", 
+		"background": "background-color",
 		"foreground": "color"
 	}
 
@@ -235,7 +283,7 @@ class CSSFactory():
 	def generate_new_property(key, value):
 		new_property = {}
 		value = value.strip()
-		
+
 		property_name = CSSFactory.get_property_name(key, value)
 
 		if (property_name == None):
@@ -252,9 +300,12 @@ class CSSFactory():
 	def generate_properties_string(css_class, dict):
 		"""Build a list of css properties and return as string."""
 
+		property_list = []
 		properties = ""
 		for prop in dict[css_class]:
-			properties +=  "%s: %s; " % (prop, dict[css_class][prop])
+			property_list.append("%s: %s; " % (prop, dict[css_class][prop]))
+
+		properties = "".join(property_list)
 
 		return properties
 
@@ -320,3 +371,8 @@ class ColorFactory():
 		""" Convert the supplied rgb tuple into hex color value"""
 
 		return "#%02x%02x%02x" % rgb
+
+class StyleSheet():
+	content=""
+	hash=""
+	time=0
