@@ -7,6 +7,38 @@ The classes generated are based on the scopes available within the color scheme.
 
 ## Usage
 
+### How to use StyledPopup as a dependencey
+
+The StyledPopup module needs to be installed as a dependency through package control in order to be able to import the new python module. Simply create a `dependencies.json` file within your plugin and add the following content.
+
+```json
+{
+	"*": {
+		"*": [
+			"StyledPopup"
+		]
+	}
+}
+```
+
+Once the file has been added to your plugin, simply run the ** Package Control: Satisfy Dependencies ** command to tell Package Control to install your dependencies. You could also restart Sublime Text and Package Control should notify you that a new dependency has been install.
+
+Once installed you can simply call the styled popup 
+
+### Calling the Styled Popup.
+
+Import the module using:
+
+```python
+import styled_popup
+```
+
+Then call the styled_popup.show_popup function passing the view associated with the popup and any arguments to be passed to the view's show_popup function. The html will have the style sheet appended automatically and any css styles that match a given scope will be styled.
+
+```python
+styled_popup.show_popup(view, html)
+```
+
 ### HTML Markup
 
 To style specific elements in the html, simply assign the element a class that matches the scope you would like to use.
@@ -18,24 +50,20 @@ To style specific elements in the html, simply assign the element a class that m
 Each nested scope selector should be applied as a seperate css class:
 
 ```html
-<span class="entity name class"> This should be styled similar to a support type within the color scheme</span>
+<span class="entity name function"> This should be styled similar to a function within the color scheme</span>
 ```
 
 ![alt text](http://huotmedia.com/github/StyledPopup/images/screen_1.png)
 
-### Calling the Styled Popup.
+The css classes will all be based on the basic supported scopes. 
 
-Import the module using:
+* string.quoted.double
+* entity.name.function
+* invalid.illegal
+* keyword.control
+* storage.type
 
-```python
-import StyledPopup
-```
-
-Then call the StyledPopup.show_popup function passing the view associated with the popup and any arguments to be passed to the view's show_popup function. The html will have the style sheet appended automatically and any css styles that match a given scope will be styled.
-
-```python
-StyledPopup.show_popup(view, html)
-```
+For a complete list of supported scopes please visit the [Textmate language grammer documentation](https://manual.macromates.com/en/language_grammars)
 
 ### Example Command
 
@@ -44,7 +72,7 @@ Create a new python file within the "User" directory of packages. Paste the foll
 ```python
 import sublime
 import sublime_plugin
-import StyledPopup
+import styled_popup
 
 class PopupTestCommand(sublime_plugin.WindowCommand):
     def run(self):
@@ -55,7 +83,7 @@ class PopupTestCommand(sublime_plugin.WindowCommand):
                   Simply wrap each element to be styled in a span and apply the
                   <span class="comment line">css classes</span> for each scope."""
 
-        StyledPopup.show_popup(self.window.active_view(), html)
+        styled_popup.show_popup(self.window.active_view(), html)
 ```
 
 Open the Sublime Text Console("ctrl+`") and enter "window.run_command('popup_test')" into the input field at the bottom of the console and press "Enter". You should see a popup window appear which follows the styling for the active view.
