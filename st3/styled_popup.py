@@ -227,7 +227,8 @@ class StackBuilder():
 				continue
 
 			if self.is_base_style(node):
-				self.set_base_style(css_properties)
+				if "html" not in self.stack:
+					self.set_base_style(css_properties)
 			else:
 				classes = self.get_node_classes_from_scope(node["scope"])
 				classes = self.filter_non_supported_classes(classes)
