@@ -4,6 +4,7 @@ import sublime_plugin
 import os
 import hashlib
 import time
+import re
 
 from plistlib import readPlistFromBytes
 
@@ -229,6 +230,7 @@ class StackBuilder():
 				self.set_base_style(css_properties)
 			else:
 				classes = self.get_node_classes_from_scope(node["scope"])
+				classes = self.filter_non_supported_classes(classes)
 				self.apply_properties_to_classes(classes, css_properties)
 
 		return self.stack
@@ -261,10 +263,32 @@ class StackBuilder():
 	def get_node_classes_from_scope(self, scope):
 		scope = "." + scope.lower().strip()
 		scope = scope.replace(" - ","")
-		scope = scope.replace(" ", ".")
+		scope = scope.replace(" ", ",")
+		scope = scope.replace("|",",")
 		scopes = scope.split(",")
 		return scopes
 
+	def filter_non_supported_classes(self, in_classes):
+		out_classes = []
+		regex = r"""\A\.(
+				comment(\.(line(\.(double-slash|double-dash))?|block(\.documentation)?))?|
+				constant(\.(numeric|character(\.escape)?|language|other))?|
+				entity(\.(name(\.(function|type|tag|section))?|other(\.(inherited-class|attribute-name))?))?|
+				invalid(\.(illegal|deprecated))?|
+				keyword(\.(control|operator|other))?|
+				markup(\.(underline(\.(link))?|bold|heading|italic|list(\.(numbered|unnumbered))?|quote|raw|other))?|
+				meta|
+				storage(\.(type|modifier))?|
+				string(\.(quoted(\.(single|double|triple|other))?|unquoted|interpolated|regexp|other))?|
+				support(\.(function|class|type|constant|variable|other))?|
+				variable(\.(parameter|language|other))?)"""
+
+		for css_class in in_classes:
+			match = re.search(regex, css_class, re.IGNORECASE + re.VERBOSE) 
+			if (match):
+				out_classes.append(css_class)
+
+		return out_classes
 
 class CSSFactory():
 
@@ -371,6 +395,7 @@ class ColorFactory():
 		""" Convert the supplied rgb tuple into hex color value"""
 
 		return "#%02x%02x%02x" % rgb
+
 
 class StyleSheet():
 	content=""
