@@ -6,8 +6,6 @@ import hashlib
 import time
 import re
 
-from plistlib import readPlistFromBytes
-
 def show_popup(view, content, *args, **kwargs):
 	"""Parse the color scheme if needed and show the styled pop-up."""
 
@@ -157,7 +155,7 @@ class SchemeParser():
 
 		content = self.load_color_scheme(color_scheme)
 		scheme = self.read_scheme(content)
-		css_stack = StackBuilder().build_stack(scheme["settings"])
+		css_stack = StackBuilder().build_stack(scheme["rules"])
 		style_sheet = self.generate_style_sheet_content(css_stack)
 		return style_sheet
 
@@ -169,8 +167,19 @@ class SchemeParser():
 
 	def read_scheme(self, scheme):
 		"""Converts supplied scheme(bytes) to python dict."""
+		scheme_values = sublime.decode_value(scheme.decode())
+		return self.expand_scheme_variables(scheme_values)
 
-		return  readPlistFromBytes(scheme)
+	def expand_scheme_variables(self, scheme):
+		rules = scheme.get("rules")
+		variables = scheme.get("variables")
+		if rules and variables:
+			for rule in rules:
+				for key in rule:
+					rule[key] = re.sub(r"var\((\s*\S*\s*)\)", r"${\1}", str(rule[key]))
+			scheme["rules"] = sublime.expand_variables(rules, variables)
+		return scheme
+
 
 	def generate_style_sheet_content(self, properties):
 		file_content = ""
@@ -196,10 +205,10 @@ class StackBuilder():
 		self.stack = {}
 
 	def is_valid_node(self, node):
-		if "settings" not in node:
+		if "scope" not in node:
 			return False
 
-		if not len(node["settings"]):
+		if not len(node["scope"]):
 			return False
 
 		return True
@@ -220,7 +229,7 @@ class StackBuilder():
 			if not self.is_valid_node(node):
 				continue
 
-			styles = node["settings"]
+			styles = node
 			css_properties = self.generate_css_properties(styles)
 
 			if not len(css_properties):
@@ -239,9 +248,9 @@ class StackBuilder():
 	def generate_css_properties(self, styles):
 		properties = {}
 		for key in styles:
-			for value in styles[key].split():
-				new_property = CSSFactory.generate_new_property(key, value)
-				properties.update(new_property)
+			value = styles[key]
+			new_property = CSSFactory.generate_new_property(key, value)
+			properties.update(new_property)
 
 		return properties
 
@@ -262,11 +271,16 @@ class StackBuilder():
 		self.stack[css_class] = properties
 
 	def get_node_classes_from_scope(self, scope):
-		scope = "." + scope.lower().strip()
-		scope = scope.replace(" - ","")
+		scope = scope.lower().strip()
+		scope = scope.replace(" - ",",")
 		scope = scope.replace(" ", ",")
 		scope = scope.replace("|",",")
-		scopes = scope.split(",")
+		scope = scope.replace("(", ",")
+		scope = scope.replace(")", ",")
+		scopes = []
+		for css_class in scope.split(","):
+			if len(css_class):
+				scopes.append("." + css_class)
 		return scopes
 
 	def filter_non_supported_classes(self, in_classes):
@@ -285,7 +299,10 @@ class StackBuilder():
 				variable(\.(parameter|language|other))?)"""
 
 		for css_class in in_classes:
-			match = re.search(regex, css_class, re.IGNORECASE + re.VERBOSE) 
+			invalid = re.search(r"\.[0-9]+", css_class)
+			if (invalid):
+				continue
+			match = re.search(regex, css_class, re.IGNORECASE + re.VERBOSE)
 			if (match):
 				out_classes.append(css_class)
 
@@ -308,6 +325,11 @@ class CSSFactory():
 	def generate_new_property(key, value):
 		new_property = {}
 		value = value.strip()
+
+		if CSSFactory.is_necessary_split_property(key, value):
+			for val in value.split():
+				new_property.update(CSSFactory.generate_new_property(key, val))
+			return new_property
 
 		property_name = CSSFactory.get_property_name(key, value)
 
@@ -338,8 +360,8 @@ class CSSFactory():
 	def get_property_name(name, value):
 		"""Get the css name of a scheme value if supported."""
 
-		# fontStyle can be mapped to font-style and font-weight. Need to handle both
-		if name == "fontStyle":
+		# font_style can be mapped to font-style and font-weight. Need to handle both
+		if name == "font_style":
 			if value == "bold":
 				return "font-weight"
 
@@ -359,6 +381,10 @@ class CSSFactory():
 			return CSSFactory.CSS_DEFAULT_VALUES[prop]
 
 		return None
+
+	@staticmethod
+	def is_necessary_split_property(name, value):
+		return name == "font_style" and " " in value
 
 class ColorFactory():
 	"""Helper class responsible for all color based calculations and conversions."""
